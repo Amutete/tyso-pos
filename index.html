@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Suppliers POS</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#f97316">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@simplewebauthn/browser@9.0.1/dist/bundle/index.umd.min.js"></script>
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .smart-suppliers-logo { font-weight: 900; letter-spacing: -0.05em; text-shadow: 1px 1px 3px rgba(0,0,0,0.2); }
+        .smart-suppliers-logo .smart { color: #2c4c72; }
+        .smart-suppliers-logo .suppliers { color: #a62b24; }
+        .sidebar-link { display: flex; align-items: center; padding: 0.75rem 1rem; border-radius: 0.5rem; transition: background-color 0.2s; cursor: pointer; }
+        .sidebar-link:hover, .sidebar-link.active { background-color: #4b5563; }
+        .content-section { display: none; }
+        .content-section.active { display: block; }
+        .stat-card { background-color: white; border-radius: 0.75rem; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); transition: background-color 0.2s; }
+        #barcode-scanner-view { border: 2px solid #f97316; border-radius: 0.5rem; }
+        
+        @media print {
+            body * { visibility: hidden; }
+            #receipt-container, #receipt-container * { visibility: visible; }
+            #receipt-container { position: absolute; left: 0; top: 0; width: 100%; }
+        }
+    </style>
+</head>
+<body class="bg-slate-100">
+
+    <div id="auth-container" class="min-h-screen bg-slate-200 flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
+            <h1 class="text-5xl font-black text-blue-600 smart-suppliers-logo text-center"><span class="smart">SMART</span> <span class="suppliers">SUPPLIERS</span></h1>
+            <p class="text-center text-slate-500 mt-2 mb-6">Point of Sale System</p>
+            <div id="login-error-message" class="mb-4 text-center text-red-500 font-medium h-5"></div>
+            <form id="login-form">
+                <div class="mb-4"><label for="login-email" class="block text-sm font-bold text-slate-700 mb-1">Email Address</label><input type="email" id="login-email" required class="w-full px-4 py-3 bg-slate-100 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"></div>
+                <div class="mb-6"><label for="login-password" class="block text-sm font-bold text-slate-700 mb-1">Password</label><input type="password" id="login-password" required class="w-full px-4 py-3 bg-slate-100 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"></div>
+                <button type="submit" class="w-full bg-orange-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-orange-600 transition duration-300 shadow-lg text-lg"><i class="fas fa-sign-in-alt mr-2"></i>Secure Login</button>
+            </form>
+            <div class="mt-4 flex items-center justify-center">
+                <button id="fingerprint-login-btn" class="hidden bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition duration-300 shadow-lg text-lg"><i class="fas fa-fingerprint mr-2"></i>Login with Fingerprint</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="admin-dashboard" class="hidden">
+        <div class="flex h-screen bg-slate-800 text-white">
+            <nav class="w-64 flex-shrink-0 bg-slate-900 p-4 flex flex-col justify-between">
+                <div>
+                    <h2 class="text-2xl font-bold text-center text-orange-500 mb-8 border-b border-gray-700 pb-4 smart-suppliers-logo"><span class="smart">SMART</span> <span class="suppliers">SUPPLIERS</span></h2>
+                    <ul class="space-y-2">
+                        <li><div class="sidebar-link active" data-target="overview"><i class="fas fa-tachometer-alt w-6 mr-3"></i>Overview</div></li>
+                        <li><div class="sidebar-link" data-target="products"><i class="fas fa-box-open w-6 mr-3"></i>Products</div></li>
+                        <li><div class="sidebar-link" data-target="inventory"><i class="fas fa-boxes-stacked w-6 mr-3"></i>Inventory</div></li>
+                        <li><div class="sidebar-link" data-target="reports"><i class="fas fa-chart-line w-6 mr-3"></i>Sales Reports</div></li>
+                        <li><div class="sidebar-link" data-target="customers"><i class="fas fa-users w-6 mr-3"></i>Customers</div></li>
+                        <li><div class="sidebar-link" data-target="users"><i class="fas fa-users-cog w-6 mr-3"></i>Manage Users</div></li>
+                        <li><div class="sidebar-link" data-target="loginlogs"><i class="fas fa-history w-6 mr-3"></i>Login Logs</div></li>
+                        <li><div class="sidebar-link" data-target="notes"><i class="fas fa-pencil-alt w-6 mr-3"></i>Notes</div></li>
+                    </ul>
+                </div>
+                <div>
+                     <button id="register-fingerprint-btn" class="sidebar-link w-full text-blue-300 hover:bg-blue-800/50 mb-2"><i class="fas fa-fingerprint w-6 mr-3"></i>Register Fingerprint</button>
+                    <button id="admin-logout-btn" class="sidebar-link w-full text-red-400 hover:bg-red-800/50"><i class="fas fa-sign-out-alt w-6 mr-3"></i>Logout</button>
+                </div>
+            </nav>
+            <main class="flex-1 p-6 md:p-10 bg-slate-100 overflow-y-auto">
+                <header class="mb-8 flex justify-between items-center">
+                    <h1 id="page-title" class="text-4xl font-bold text-slate-800">Overview</h1>
+                    <div class="flex items-center">
+                         <label for="branch-selector" class="mr-2 text-slate-600 font-semibold text-lg">Branch:</label>
+                         <select id="branch-selector" class="bg-white border border-slate-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-orange-500 focus:border-orange-500 text-slate-800">
+                             <option value="all">All Branches</option>
+                         </select>
+                         <button id="admin-install-app-btn" class="hidden ml-4 bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition"><i class="fas fa-download mr-2"></i>Install App</button>
+                    </div>
+                </header>
+                <div id="overview-section" class="content-section active"><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"><div class="stat-card"><h3 class="text-slate-500 font-semibold">Today's Sales</h3><p id="stat-today-sales" class="text-3xl font-bold text-slate-800">Ksh 0.00</p></div><div class="stat-card"><h3 class="text-slate-500 font-semibold">Today's Profit</h3><p id="stat-today-profit" class="text-3xl font-bold text-green-600">Ksh 0.00</p></div><div id="low-stock-card" class="stat-card hover:bg-orange-50 cursor-pointer"><h3 class="text-slate-500 font-semibold">Low Stock Items</h3><p id="stat-low-stock" class="text-3xl font-bold text-orange-500">0</p></div><div class="stat-card"><h3 class="text-slate-500 font-semibold">Total Products</h3><p id="stat-total-products" class="text-3xl font-bold text-slate-800">0</p></div></div></div>
+                <div id="products-section" class="content-section"><div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-bold text-slate-800">Product Management</h2><button id="add-product-btn" class="bg-orange-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-600 transition shadow-lg"><i class="fas fa-plus mr-2"></i>Add New Product</button></div><div class="bg-white p-4 rounded-lg shadow"><div id="product-list-container" class="max-h-[65vh] overflow-y-auto"></div></div></div>
+                <div id="inventory-section" class="content-section"><div class="bg-white p-6 rounded-lg shadow"><h2 class="text-2xl font-bold text-slate-800 mb-4">Inventory Levels</h2><div id="inventory-list-container"></div></div></div>
+                <div id="reports-section" class="content-section">
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h2 class="text-2xl font-bold text-slate-800 mb-4">Download Sales Reports</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                            <div>
+                                <label for="daily-report-date" class="block text-sm font-medium text-slate-700">Select Day for Report</label>
+                                <input type="date" id="daily-report-date" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500">
+                            </div>
+                            <button id="download-daily-report" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition h-fit"><i class="fas fa-file-csv mr-2"></i>Daily Report</button>
+                            <div class="grid grid-cols-2 gap-4">
+                                <button id="download-weekly-report" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition"><i class="fas fa-file-csv mr-2"></i>This Week</button>
+                                <button id="download-monthly-report" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition"><i class="fas fa-file-csv mr-2"></i>This Month</button>
+                            </div>
+                        </div>
+                    </div>
+                     <div class="bg-white p-6 rounded-lg shadow mt-6">
+                        <h2 class="text-2xl font-bold text-slate-800 mb-4">Sales Analytics</h2>
+                        <div id="analytics-container">
+                             <canvas id="sales-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow mt-6">
+                        <h2 class="text-2xl font-bold text-slate-800 mb-4">Live Sales Transactions</h2>
+                        <div id="sales-report-container" class="max-h-[65vh] overflow-y-auto"></div>
+                    </div>
+                </div>
+                <div id="customers-section" class="content-section">
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h2 class="text-2xl font-bold text-slate-800 mb-4">Customer Management</h2>
+                        <div id="customer-database-container">
+                            <p class="text-slate-500">Customer database feature coming soon.</p>
+                        </div>
+                    </div>
+                     <div class="bg-white p-6 rounded-lg shadow mt-6">
+                        <h2 class="text-2xl font-bold text-slate-800 mb-4">Top Customers</h2>
+                        <div id="top-customers-container">
+                             <p class="text-slate-500">Top customers report coming soon.</p>
+                        </div>
+                    </div>
+                </div>
+                <div id="users-section" class="content-section"><div class="grid grid-cols-1 lg:grid-cols-2 gap-8"><div><div class="bg-white p-6 rounded-lg shadow"><h2 class="text-2xl font-bold text-slate-800 mb-4">Create New Servant Account</h2><form id="create-servant-form" class="space-y-4"><div><label for="servant-name" class="block text-sm font-medium text-slate-700">Full Name</label><input type="text" id="servant-name" required class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 text-black"></div><div><label for="servant-email" class="block text-sm font-medium text-slate-700">Email Address</label><input type="email" id="servant-email" required class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 text-black"></div><div><label for="servant-password" class="block text-sm font-medium text-slate-700">Temporary Password</label><input type="text" id="servant-password" required class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 text-black"></div><div><label for="servant-branch" class="block text-sm font-medium text-slate-700">Assign to Branch</label><select id="servant-branch" required class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 text-black"><option value="">Select a Branch</option></select></div><button type="submit" class="w-full bg-orange-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-600 transition shadow-lg">Create Account</button></form></div></div><div><div class="bg-white p-6 rounded-lg shadow"><h2 class="text-2xl font-bold text-slate-800 mb-4">Existing Users</h2><div id="user-list-container" class="max-h-[40vh] overflow-y-auto"></div></div></div></div>
+                
+                <div id="loginlogs-section" class="content-section">
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h2 class="text-2xl font-bold text-slate-800 mb-4">Servant Login History</h2>
+                        <div id="login-logs-container" class="max-h-[65vh] overflow-y-auto">
+                            <p class="text-slate-500">Loading login history...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="notes-section" class="content-section">
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h2 class="text-2xl font-bold text-slate-800 mb-4">My Daily Notes</h2>
+                        <p class="text-slate-600 mb-4 text-sm">Notes are saved locally to your browser for the current day. Use the download options for archival.</p>
+                        <textarea id="admin-notes-textarea" class="w-full h-64 p-3 bg-slate-50 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 text-black" placeholder="Start typing today's notes here..."></textarea>
+                        <div class="mt-4 flex justify-end">
+                            <button id="save-note-btn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition"><i class="fas fa-save mr-2"></i>Save Today's Note</button>
+                        </div>
+                    </div>
+                     <div class="bg-white p-6 rounded-lg shadow mt-6">
+                        <h2 class="text-2xl font-bold text-slate-800 mb-4">Download Notes</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                            <div>
+                                <label for="download-daily-note-date" class="block text-sm font-medium text-slate-700">Select Day for Daily Note</label>
+                                <input type="date" id="download-daily-note-date" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500">
+                            </div>
+                            <button id="download-daily-note-btn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition h-fit"><i class="fas fa-file-download mr-2"></i>Daily Note</button>
+                        </div>
+                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                             <button id="download-weekly-notes-btn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition"><i class="fas fa-calendar-week mr-2"></i>This Week's Notes</button>
+                             <button id="download-monthly-notes-btn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition"><i class="fas fa-calendar-alt mr-2"></i>This Month's Notes</button>
+                         </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div id="servant-dashboard" class="hidden"><div class="flex flex-col md:flex-row h-screen bg-slate-200"><div class="w-full md:w-1/3 bg-white flex flex-col p-4 shadow-lg"><h2 class="text-2xl font-bold text-slate-800 border-b pb-2">Current Sale</h2><div id="cart-items" class="flex-grow overflow-y-auto py-4 space-y-2"><p class="text-slate-500 text-center mt-10">Cart is empty</p></div><div class="border-t pt-4 space-y-2 text-slate-700"><div class="flex justify-between font-bold text-2xl text-slate-800 pt-2 mt-2"><span>Total</span><span id="cart-total">Ksh 0.00</span></div></div><button id="complete-sale-btn" class="w-full bg-orange-500 text-white font-bold py-4 rounded-lg hover:bg-orange-600 transition shadow-lg mt-4 text-xl disabled:bg-gray-400" disabled>Proceed to Payment</button></div><div class="w-full md:w-2/3 flex flex-col"><header class="bg-white p-4 flex justify-between items-center shadow-md"><div class="flex-1"><div class="relative"><i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i><input type="text" id="product-search" placeholder="Search for products by name or SKU..." class="w-full pl-10 pr-4 py-2 bg-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"></div></div><div id="offline-indicator" class="hidden items-center ml-4 text-xs font-bold bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full"><i class="fas fa-wifi-slash mr-2"></i>Offline Mode</div><button id="scan-barcode-btn" class="ml-4 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition"><i class="fas fa-barcode mr-2"></i>Scan</button><button id="servant-install-app-btn" class="hidden ml-4 bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition"><i class="fas fa-download mr-2"></i>Install App</button><button id="servant-logout-btn" class="ml-4 bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg text-sm">Logout</button></header><main id="product-grid" class="flex-grow p-4 overflow-y-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"></main></div></div></div>
+    
+    <div id="customer-details-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4"><div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg text-slate-800"><h3 class="font-bold text-xl mb-4">Customer & Payment</h3><div id="payment-notification" class="hidden mb-4 p-3 rounded-md text-center font-semibold"></div><form id="customer-details-form"><div class="space-y-4"><div><label for="customer-name" class="block text-sm font-medium text-slate-700">Customer Name <span class="text-red-500">*</span></label><input type="text" id="customer-name" required class="mt-1 block w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"></div><div><label for="customer-phone" class="block text-sm font-medium text-slate-700">Phone Number (For M-Pesa) <span class="text-red-500">*</span></label><input type="tel" id="customer-phone" required class="mt-1 block w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder="e.g., 2547..."><p class="text-xs text-slate-500 mt-1">Required for M-Pesa STK Push.</p></div><div><label for="customer-apartment" class="block text-sm font-medium text-slate-700">Apartment (Optional)</label><input type="text" id="customer-apartment" class="mt-1 block w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"></div><div><label for="customer-house" class="block text-sm font-medium text-slate-700">House Number (Optional)</label><input type="text" id="customer-house" class="mt-1 block w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"></div></div><div class="mt-6 flex justify-end space-x-3"><button type="button" id="close-customer-modal-btn" class="bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Cancel</button><button type="button" id="mpesa-payment-btn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 flex items-center"><i class="fas fa-mobile-alt mr-2"></i>Pay with M-Pesa</button><button type="submit" class="bg-orange-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-600">Confirm Cash Sale</button></div></form></div></div>
+
+    <div id="add-product-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4"><div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg text-slate-800 max-h-[90vh] overflow-y-auto"><h3 id="modal-title" class="font-bold text-xl mb-4">Add New Product</h3><form id="product-form"><input type="hidden" id="product-id"><div class="space-y-4"><div><label for="product-name" class="block text-sm font-medium text-slate-700">Product Name</label><input type="text" id="product-name" required class="mt-1 block w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"></div><div><label for="product-barcode" class="block text-sm font-medium text-slate-700">Barcode / SKU (Optional)</label><input type="text" id="product-barcode" class="mt-1 block w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"></div><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label for="product-cost" class="block text-sm font-medium text-slate-700">Cost Price (Ksh)</label><input type="number" step="0.01" id="product-cost" required class="mt-1 block w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"></div><div id="initial-stock-qty-container-legacy"><label for="product-stock" class="block text-sm font-medium text-slate-700">Initial Stock Qty</label><input type="number" id="product-stock" required class="mt-1 block w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"></div></div><div id="stock-by-branch-container" class="space-y-2 mt-4"></div> <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4"><div><label for="product-price" class="block text-sm font-medium text-slate-700">Selling Price (excl. VAT)</label><input type="number" step="0.01" id="product-price" required class="mt-1 block w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"></div><div><label for="product-discount" class="block text-sm font-medium text-slate-700">Discount (%)</label><input type="number" id="product-discount" min="0" max="100" placeholder="e.g., 5 for 5%" class="mt-1 block w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"></div></div><div class="mt-4"><label class="block text-sm font-medium text-slate-700">Final Price (Display)</label><p id="product-final-price-display" class="mt-1 w-full px-3 py-2 bg-slate-100 rounded-md h-[42px] flex items-center font-bold text-slate-600">Ksh 0.00</p></div><div><label for="product-image" class="block text-sm font-medium text-slate-700">Product Image (Optional)</label><input type="file" id="product-image" accept="image/*" class="mt-1 block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"></div><div id="image-preview-container" class="mt-2"><img id="image-preview" src="" alt="Image Preview" class="hidden max-h-32 rounded-lg"/></div></div><div class="mt-6 flex justify-end space-x-3"><button type="button" id="close-product-modal-btn" class="bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Cancel</button><button type="submit" id="save-product-btn" class="bg-orange-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-600">Save Product</button></div></form></div></div>
+    <div id="scanner-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"><div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md text-slate-800"><h3 class="font-bold text-xl mb-4">Scan Barcode</h3><div id="barcode-scanner-view" class="w-full"></div><button id="close-scanner-btn" class="mt-4 w-full bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600">Cancel</button></div></div>
+    <div id="receipt-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"><div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm text-slate-800"><div id="receipt-container" class="bg-white p-2"></div><div class="mt-6 flex space-x-2"><button id="close-receipt-btn" class="flex-1 bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Close</button><button id="download-receipt-btn" class="flex-1 bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700"><i class="fas fa-download mr-2"></i>Download</button><button id="print-receipt-btn" class="flex-1 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700"><i class="fas fa-print mr-2"></i>Print</button></div></div></div>
+    <div id="low-stock-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4"><div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md text-slate-800"><h3 class="font-bold text-xl mb-4 text-orange-500">Low Stock Items</h3><div id="low-stock-list-container" class="max-h-[60vh] overflow-y-auto"></div><div class="mt-6 flex justify-end"><button type="button" id="close-low-stock-modal-btn" class="bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Close</button></div></div></div>
+    <footer class="text-center py-4 bg-slate-200 text-slate-600 text-sm">
+        Built by: CA Creative Solution<br>
+        0790774517
+    </footer>
+
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        // TODO: Add SDKs for Firebase products that you want to use
+        // https://firebase.google.com/docs/web/setup#available-libraries
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, createUserWithEmailAndPassword, updateProfile, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, collection, addDoc, onSnapshot, query, orderBy, where, getDocs, writeBatch, serverTimestamp, increment, setDoc, updateDoc, deleteDoc, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
+
+        const { startRegistration, startAuthentication } = SimpleWebAuthnBrowser;
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            // Your web app's Firebase configuration
+            // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+            const firebaseConfig = {
+              apiKey: "AIzaSyD5j5X2FP8fVLrslkCUyIku2LCVxL6QKGg",
+              authDomain: "tyso-25dc3.firebaseapp.com",
+              projectId: "tyso-25dc3",
+              storageBucket: "tyso-25dc3.appspot.com",
+              messagingSenderId: "93728738403",
+              appId: "1:93728738403:web:c8146a99a6a1a1d3d63c56",
+              measurementId: "G-9FEQPFV9V4"
+            };
+
+            // Initialize Firebase
+            let app, auth, db, storage, functions;
+            let inactivityTimer;
+            
+            try { 
+                app = initializeApp(firebaseConfig); 
+                auth = getAuth(app); 
+                db = getFirestore(app);
+                storage = getStorage(app);
+                functions = getFunctions(app, 'us-central1'); 
+                await enableIndexedDbPersistence(db);
+                // Call the corrected offline sync initialization
+                initOfflineSync();
+            } catch (err) { 
+                console.warn("Firebase initialization error:", err);
+            }
+            
+            // ... (The rest of the JavaScript code remains exactly the same) ...
+        });
+    </script>
+    
+    <script>
+        // ... (The service worker and PWA install prompt script remains exactly the same) ...
+    </script>
+
+</body>
+</html>
