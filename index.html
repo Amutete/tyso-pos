@@ -217,7 +217,7 @@
                 functions = getFunctions(app, 'us-central1'); 
                 await enableIndexedDbPersistence(db);
                 // Call the corrected offline sync initialization
-                initOfflineSync();
+                // initOfflineSync(); // <-- THIS LINE WAS CAUSING THE CRASH AND HAS BEEN COMMENTED OUT
             } catch (err) { 
                 console.warn("Firebase initialization error:", err);
             }
